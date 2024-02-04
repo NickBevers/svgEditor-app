@@ -1,0 +1,41 @@
+#root {
+  max-width: 100vw;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.appContainer{
+  display: flex;
+  gap: 2rem;
+}
+
+.border--red {
+  border: 1px solid red;
+}
+
+.svgInput__container{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: clamp(300px, 50%, 500px);
+}
+
+.svgInput{
+  box-sizing: border-box;
+  width: 100%;
+  height: 50%;
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 5px;
+  font-size: 1rem;
+  border: none;
+}
+
+.button__container{
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
