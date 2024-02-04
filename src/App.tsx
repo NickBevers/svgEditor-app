@@ -1,4 +1,3 @@
-/* eslint-disable no-case-declarations */
 import './App.css'
 import React, { useEffect, useState } from 'react'
 
@@ -12,10 +11,7 @@ import React, { useEffect, useState } from 'react'
 //     x="110"
 //     fill="black"
 //     font-family="Arial, Helvetica, sans-serif"
-//     font-size="50"
-//     font-size-adjust="1">
-//     Hello
-//   </text>
+//     font-size="50">Hello</text>
 //   <polygon points="200,10 250,190 150,190" fill="lime" />
 // </svg>`
 
@@ -87,6 +83,7 @@ const App = () => {
 
   const DEFAULT_CANVAS_WIDTH = 5000
   const DEFAULT_CANVAS_HEIGHT = 5000
+  const DEFAULT_TEXT_ASCENDING = 0.75
 
   // get the canvas element and set it to the canvas state on mount
   useEffect(() => {
@@ -133,7 +130,8 @@ const App = () => {
         const cy = parseInt(attributes.cy!);
         const r = parseInt(attributes.r!);
         if (Math.sqrt((mouseX - cx) ** 2 + (mouseY - cy) ** 2) < r) {
-          console.log('circle clicked')
+          console.log('circle clicked');
+          return true;
         }
         break
       case 'ellipse':
@@ -142,7 +140,8 @@ const App = () => {
         const rx = parseInt(attributes.rx!);
         const ry = parseInt(attributes.ry!);
         if (Math.sqrt((mouseX - cx2) ** 2 / rx ** 2 + (mouseY - cy2) ** 2 / ry ** 2) < 1) {
-          console.log('ellipse clicked')
+          console.log('ellipse clicked');
+          return true;
         }
         break
       case 'line':
@@ -152,7 +151,8 @@ const App = () => {
         const y2 = parseInt(attributes.y2!)
 
         if (mouseX > x1 && mouseX < x2 && mouseY > y1 && mouseY < y2) {
-          console.log('line clicked')
+          console.log('line clicked');
+          return true;
         }
         break
       case 'polyline':
@@ -164,7 +164,8 @@ const App = () => {
         const minY = Math.min(...yPoints)
         const maxY = Math.max(...yPoints)
         if (mouseX > minX && mouseX < maxX && mouseY > minY && mouseY < maxY) {
-          console.log('polyline clicked')
+          console.log('polyline clicked');
+          return true;
         }
         break
       case 'polygon':
@@ -176,38 +177,27 @@ const App = () => {
         const minY2 = Math.min(...yPoints2);
         const maxY2 = Math.max(...yPoints2);
         if (mouseX > minX2 && mouseX < maxX2 && mouseY > minY2 && mouseY < maxY2) {
-          console.log('polygon clicked')
+          console.log('polygon clicked');
+          return true;
         }
         break
       case 'path':
         const path = new Path2D(attributes.d!)
         if (canvas?.getContext('2d')?.isPointInPath(path, mouseX, mouseY)) {
-          console.log('path clicked')
+          console.log('path clicked');
+          return true;
         }
         break
       case 'text':
-        const textX = parseInt(attributes.x!)
-        const textY = parseInt(attributes.y!)
-        const textSizes = getTextSizes(element.textContent!, attributes['font-size']!, attributes['font-family']!, attributes['font-size-adjust']!);
-
+        const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
+        const textSizes = getTextSizes(textContent!, attributes['font-size']!, attributes['font-family']!, attributes['font-size-adjust']!);
         const textWidth = Math.round(textSizes.width);
         const textHeight = Math.round(textSizes.height);
-
-        console.log('textWidth: ', textWidth, 'textHeight: ', textHeight, 'textX: ', textX, 'textY: ', textY)
-
-        // if the mouse is within the bounds of the text element, log 'text clicked'
-        if (mouseX > textX && mouseX < (textX + textWidth)) {
-          console.log('x is within the bounds of the text')
-        }
-
-        console.log('mouseY: ', mouseY, 'textY: ', textY, 'textHeight: ', textHeight)
-
-        if (mouseY > textY && mouseY < (textY + textHeight)) {
-          console.log('y is within the bounds of the text')
-        }
-
-        if (mouseX > textX && mouseX < (textX + textWidth) && mouseY > textY && mouseY < (textY + textHeight)) {
-          console.log('text clicked')
+        const textX = parseInt(attributes.x!)
+        const textY = parseInt(attributes.y!)
+        if (mouseX > textX && mouseX < (textX + textWidth) && mouseY > (textY - (textHeight * DEFAULT_TEXT_ASCENDING)) && mouseY < (textY + (textHeight * (1 - DEFAULT_TEXT_ASCENDING)))) {
+          console.log('text clicked');
+          return true;
         }
         break
         default:
@@ -305,15 +295,14 @@ const App = () => {
         const textWidth = Math.round(textSizes.width);
         const textHeight = Math.round(textSizes.height);
         
-        console.log('textWidth: ', textWidth, 'textHeight: ', textHeight, 'textX: ', parseInt(attributes.x), 'textY: ', parseInt(attributes.y))
         ctx.strokeStyle = 'red'
-        ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y), textWidth, textHeight)
+        ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) - (textHeight * DEFAULT_TEXT_ASCENDING), textWidth, textHeight)
+        // ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) - textHeight, textWidth, parseInt(attributes.y))
         break
       // case 'multiLineText':
       //   // clean up the text content and split it into lines
       //   const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
       //   const textLines = textContent?.split('\n')
-      //   console.log('textLines: ', textLines)
       //   textLines?.forEach((line, index) => {
       //     ctx.font = `${attributes['font-size']}px ${attributes['font-family']}`
       //     ctx.fillStyle = attributes.fill
@@ -372,6 +361,27 @@ const App = () => {
     ctx.clearRect(0, 0, canvas?.width ?? DEFAULT_CANVAS_WIDTH, canvas?.height ?? DEFAULT_CANVAS_HEIGHT);
   }
 
+  const handleCanvasClick = (e: MouseEvent) => {
+    const mouseX = e.offsetX
+    const mouseY = e.offsetY
+
+    const elArrLength = svgElements?.length ?? 0
+
+    for (let i = elArrLength - 1; i >= 0; i--) {
+      const clickedElement = containsMouse(svgElements![i], mouseX, mouseY);
+      if (clickedElement) {
+        break;
+      }
+    }
+
+    // svgElements?.reverse().forEach((el) => {
+    //   const clickedElement = containsMouse(el, mouseX, mouseY);
+    //   if (clickedElement) {
+    //     break;
+    //   }
+    // })
+  }
+
   useEffect(() => {
     const ctx = canvas?.getContext('2d');
     if (!ctx) return;
@@ -381,15 +391,7 @@ const App = () => {
       setMouseY(e.offsetY)
     })
 
-    canvas?.addEventListener('mouseup', (e) => {
-      const mouseX = e.offsetX
-      const mouseY = e.offsetY
-
-      // check if the x and y coordinates are within the bounds of any of the svg elements and if so, set the active element to that element
-      svgElements?.reverse().forEach((el) => {
-        containsMouse(el, mouseX, mouseY)
-      })
-    })
+    canvas?.addEventListener('click', handleCanvasClick, {once: true})
 
   }, [canvas, containsMouse, svgElements])
 
