@@ -71,12 +71,16 @@ interface SVGAttributes {
   // Add more event handlers as needed
 }
 
+interface Attributes {
+  [key: string]: string
+}
 
 const App = () => {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [svgString, setSvgString] = useState('')
   const [svgElements, setSvgElements] = useState<Element[] | null>(null)
-  // const [activeElement, setActiveElement] = useState<Element | null>(null)
+  const [activeElement, setActiveElement] = useState<Element | null>(null)
+  // const [editable, setEditable] = useState<Attributes | null>(null)
 
   const [mouseX, setMouseX] = useState(0)
   const [mouseY, setMouseY] = useState(0)
@@ -108,7 +112,6 @@ const App = () => {
     return { width: bbox.width, height: bbox.height, bWidth: boundingBox.width, bHeight: boundingBox.height};
 }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const containsMouse = (element: Element, mouseX: number, mouseY: number) => {
     const attributes :SVGAttributes = getAttributes(element);
     const tagName = element.tagName;
@@ -122,6 +125,7 @@ const App = () => {
       
         if (mouseX > x && mouseX < (x + width) && mouseY > y && mouseY < (y + height)) {
           console.log('rect clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -131,6 +135,7 @@ const App = () => {
         const r = parseInt(attributes.r!);
         if (Math.sqrt((mouseX - cx) ** 2 + (mouseY - cy) ** 2) < r) {
           console.log('circle clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -141,6 +146,7 @@ const App = () => {
         const ry = parseInt(attributes.ry!);
         if (Math.sqrt((mouseX - cx2) ** 2 / rx ** 2 + (mouseY - cy2) ** 2 / ry ** 2) < 1) {
           console.log('ellipse clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -152,6 +158,7 @@ const App = () => {
 
         if (mouseX > x1 && mouseX < x2 && mouseY > y1 && mouseY < y2) {
           console.log('line clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -165,6 +172,7 @@ const App = () => {
         const maxY = Math.max(...yPoints)
         if (mouseX > minX && mouseX < maxX && mouseY > minY && mouseY < maxY) {
           console.log('polyline clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -178,6 +186,7 @@ const App = () => {
         const maxY2 = Math.max(...yPoints2);
         if (mouseX > minX2 && mouseX < maxX2 && mouseY > minY2 && mouseY < maxY2) {
           console.log('polygon clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -185,6 +194,7 @@ const App = () => {
         const path = new Path2D(attributes.d!)
         if (canvas?.getContext('2d')?.isPointInPath(path, mouseX, mouseY)) {
           console.log('path clicked');
+          setActiveElement(element);
           return true;
         }
         break
@@ -197,10 +207,12 @@ const App = () => {
         const textY = parseInt(attributes.y!)
         if (mouseX > textX && mouseX < (textX + textWidth) && mouseY > (textY - (textHeight * DEFAULT_TEXT_ASCENDING)) && mouseY < (textY + (textHeight * (1 - DEFAULT_TEXT_ASCENDING)))) {
           console.log('text clicked');
+          setActiveElement(element);
           return true;
         }
         break
         default:
+          setActiveElement(null);
         break
     }
   }
@@ -223,10 +235,6 @@ const App = () => {
     return;
   }, [svgElements])
 
-  // make a key value type for the attributes (attributes is an object with key value pairs where the key is a string and the value is a string)
-  interface Attributes {
-    [key: string]: string
-  }
 
   const addToCanvas = (ctx: CanvasRenderingContext2D, element: Element, attributes: Attributes) => {
     if (!ctx) return;
@@ -321,24 +329,6 @@ const App = () => {
         break
     }
   }
-
-  // const handleMouseOver = (e: React.MouseEvent<HTMLCanvasElement>) => {
-  //   const canvas: HTMLCanvasElement = document.getElementById('svgCanvas') as HTMLCanvasElement
-  //   const ctx = canvas.getContext('2d')
-  //   if (!ctx) return
-
-  //   const x = e.clientX
-  //   const y = e.clientY
-  //   const element = document.elementFromPoint(x, y)
-  //   if (element) {
-  //     console.log('element: ', element)
-  //     const elementIndex = svgElements?.findIndex((svgElement) => svgElement === element)
-  //     if (elementIndex !== -1) {
-  //       const attributes = getAttributes(element)
-  //       addToCanvas(ctx, element, attributes)
-  //     }
-  //   }
-  // }
   
   const loadSvg = () => {
     const ctx = canvas?.getContext('2d')
@@ -368,19 +358,26 @@ const App = () => {
     const elArrLength = svgElements?.length ?? 0
 
     for (let i = elArrLength - 1; i >= 0; i--) {
-      const clickedElement = containsMouse(svgElements![i], mouseX, mouseY);
-      if (clickedElement) {
-        break;
-      }
-    }
+      // if the active element is the same as the clicked element, break
+      // if (activeElement === svgElements![i]) {
+      //   console.log('activeElement clicked')
+      //   break;
+      // }
 
-    // svgElements?.reverse().forEach((el) => {
-    //   const clickedElement = containsMouse(el, mouseX, mouseY);
-    //   if (clickedElement) {
-    //     break;
-    //   }
-    // })
+      const clickedElement = containsMouse(svgElements![i], mouseX, mouseY);
+      if (clickedElement) break;
+    }
   }
+
+  useEffect(() => {
+    if (!activeElement) return;
+    console.log('activeElement: ', activeElement)
+    // setEditable(getAttributes(activeElement!))
+  }, [activeElement])
+
+  // useEffect(() => {
+  //   console.log('editable: ', editable)
+  // }, [editable])
 
   useEffect(() => {
     const ctx = canvas?.getContext('2d');
@@ -391,7 +388,7 @@ const App = () => {
       setMouseY(e.offsetY)
     })
 
-    canvas?.addEventListener('click', handleCanvasClick, {once: true})
+    canvas?.addEventListener('mousedown', handleCanvasClick, {once: true})
 
   }, [canvas, containsMouse, svgElements])
 
