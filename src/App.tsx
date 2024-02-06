@@ -1,19 +1,41 @@
 import './App.css'
 import React, { useEffect, useState } from 'react'
+import { getCoords } from './PathHelpers';
 
-// const tempSVG =`
-// <svg
-//   viewBox="0 0 600 600"
-//   xmlns="http://www.w3.org/2000/svg">
-//   <rect width="200" height="100" x="100" y="50" rx="20" ry="20" fill="blue" />
-//   <text
-//     y="400"
-//     x="110"
-//     fill="black"
-//     font-family="Arial, Helvetica, sans-serif"
-//     font-size="50">Hello</text>
-//   <polygon points="200,10 250,190 150,190" fill="lime" />
-// </svg>`
+`
+<svg
+  viewBox="0 0 600 600"
+  xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="100" x="300" y="150" rx="20" ry="20" fill="blue" />
+  <text
+    y="400"
+    x="110"
+    fill="black"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="50">Hello</text>
+    <path
+      fill="orange"
+      d="M 10,30
+        A 20,20 0,0,1 50,30
+        A 20,20 0,0,1 90,30
+        Q 90,60 50,90
+        Q 10,60 10,30 z" />
+  <polygon points="200,10 250,190 150,190" fill="lime" />
+</svg>
+`
+
+/*
+
+FOR DRAGGING ELEMENTS:
+- Add an event listener for mousedown on the canvas
+- On mousedown, check if the mouse is over an element
+- If it is, set that element as the active element and set the mouse position as the offset from the top left of the element
+- Add an event listener for mousemove on the canvas
+- on mousemove, if an element is active, update the position of the element to the mouse position minus the offset
+- Add an event listener for mouseup on the canvas
+- on mouseup, set the active element to null
+
+*/
 
 interface SVGAttributes {
   // Presentation Attributes
@@ -75,12 +97,24 @@ interface Attributes {
   [key: string]: string
 }
 
+interface Coordinates {
+  // top left
+  tlx: number;
+  tly: number;
+  // bottom right
+  brx: number;
+  bry: number;
+}
+
 const App = () => {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [svgString, setSvgString] = useState('')
   const [svgElements, setSvgElements] = useState<Element[] | null>(null)
   const [activeElement, setActiveElement] = useState<Element | null>(null)
-  // const [editable, setEditable] = useState<Attributes | null>(null)
+  // const [editable, setEditable] = useState<Element | null>(null)
+
+  // creat a state to hold an object for each element in the svg with the top left and bottom right coordinates
+  const [elementCoordinates, setElementCoordinates] = useState<Coordinates[] | null>(null)
 
   const [mouseX, setMouseX] = useState(0)
   const [mouseY, setMouseY] = useState(0)
@@ -124,7 +158,7 @@ const App = () => {
         const height = parseInt(attributes.height!);
       
         if (mouseX > x && mouseX < (x + width) && mouseY > y && mouseY < (y + height)) {
-          console.log('rect clicked');
+          // console.log('rect clicked');
           setActiveElement(element);
           return true;
         }
@@ -134,7 +168,7 @@ const App = () => {
         const cy = parseInt(attributes.cy!);
         const r = parseInt(attributes.r!);
         if (Math.sqrt((mouseX - cx) ** 2 + (mouseY - cy) ** 2) < r) {
-          console.log('circle clicked');
+          // console.log('circle clicked');
           setActiveElement(element);
           return true;
         }
@@ -145,7 +179,7 @@ const App = () => {
         const rx = parseInt(attributes.rx!);
         const ry = parseInt(attributes.ry!);
         if (Math.sqrt((mouseX - cx2) ** 2 / rx ** 2 + (mouseY - cy2) ** 2 / ry ** 2) < 1) {
-          console.log('ellipse clicked');
+          // console.log('ellipse clicked');
           setActiveElement(element);
           return true;
         }
@@ -157,7 +191,7 @@ const App = () => {
         const y2 = parseInt(attributes.y2!)
 
         if (mouseX > x1 && mouseX < x2 && mouseY > y1 && mouseY < y2) {
-          console.log('line clicked');
+          // console.log('line clicked');
           setActiveElement(element);
           return true;
         }
@@ -171,7 +205,7 @@ const App = () => {
         const minY = Math.min(...yPoints)
         const maxY = Math.max(...yPoints)
         if (mouseX > minX && mouseX < maxX && mouseY > minY && mouseY < maxY) {
-          console.log('polyline clicked');
+          // console.log('polyline clicked');
           setActiveElement(element);
           return true;
         }
@@ -185,7 +219,7 @@ const App = () => {
         const minY2 = Math.min(...yPoints2);
         const maxY2 = Math.max(...yPoints2);
         if (mouseX > minX2 && mouseX < maxX2 && mouseY > minY2 && mouseY < maxY2) {
-          console.log('polygon clicked');
+          // console.log('polygon clicked');
           setActiveElement(element);
           return true;
         }
@@ -193,7 +227,7 @@ const App = () => {
       case 'path':
         const path = new Path2D(attributes.d!)
         if (canvas?.getContext('2d')?.isPointInPath(path, mouseX, mouseY)) {
-          console.log('path clicked');
+          // console.log('path clicked');
           setActiveElement(element);
           return true;
         }
@@ -206,21 +240,18 @@ const App = () => {
         const textX = parseInt(attributes.x!)
         const textY = parseInt(attributes.y!)
         if (mouseX > textX && mouseX < (textX + textWidth) && mouseY > (textY - (textHeight * DEFAULT_TEXT_ASCENDING)) && mouseY < (textY + (textHeight * (1 - DEFAULT_TEXT_ASCENDING)))) {
-          console.log('text clicked');
+          // console.log('text clicked');
           setActiveElement(element);
           return true;
         }
         break
         default:
           setActiveElement(null);
+          return false;
         break
     }
   }
-
-  const handleSVGChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSvgString(e.target.value)
-  }
-
+  
   const getAttributes = (element: Element) => {
     const attributeObject = [...element.attributes].reduce((acc, attribute) => {
       const key = attribute.name
@@ -230,10 +261,89 @@ const App = () => {
     
     return attributeObject
   }
+  const calculateTopLeftBottomRight = (element: Element) => {
+    const attributes: Attributes = getAttributes(element)
+    const tagName = element.tagName
+    let topLeftX = 0
+    let topLeftY = 0
+    let bottomRightX = 0
+    let bottomRightY = 0
+
+    switch (tagName) {
+      case 'rect':
+        topLeftX = parseInt(attributes.x!)
+        topLeftY = parseInt(attributes.y!)
+        bottomRightX = parseInt(attributes.x!) + parseInt(attributes.width!)
+        bottomRightY = parseInt(attributes.y!) + parseInt(attributes.height!)
+        break
+      case 'circle':
+        topLeftX = parseInt(attributes.cx!) - parseInt(attributes.r!)
+        topLeftY = parseInt(attributes.cy!) - parseInt(attributes.r!)
+        bottomRightX = parseInt(attributes.cx!) + parseInt(attributes.r!)
+        bottomRightY = parseInt(attributes.cy!) + parseInt(attributes.r!)
+        break
+      case 'ellipse':
+        topLeftX = parseInt(attributes.cx!) - parseInt(attributes.rx!)
+        topLeftY = parseInt(attributes.cy!) - parseInt(attributes.ry!)
+        bottomRightX = parseInt(attributes.cx!) + parseInt(attributes.rx!)
+        bottomRightY = parseInt(attributes.cy!) + parseInt(attributes.ry!)
+        break
+      case 'line':
+        topLeftX = parseInt(attributes.x1!)
+        topLeftY = parseInt(attributes.y1!)
+        bottomRightX = parseInt(attributes.x2!)
+        bottomRightY = parseInt(attributes.y2!)
+        break
+      case 'polyline':
+        const points = attributes.points?.split(' ').map((point: string) => point.split(',').map(Number))
+        const xPoints = points?.map((point: number[]) => point[0]) ?? []
+        const yPoints = points?.map((point: number[]) => point[1]) ?? []
+        topLeftX = Math.min(...xPoints)
+        topLeftY = Math.min(...yPoints)
+        bottomRightX = Math.max(...xPoints)
+        bottomRightY = Math.max(...yPoints)
+        break
+      case 'polygon':
+        const points2 = attributes.points?.split(' ').map((point: string) => point.split(',').map(Number)) ?? []
+        const xPoints2 = points2.map((point: number[]) => point[0]);
+        const yPoints2 = points2.map((point: number[]) => point[1]);
+        topLeftX = Math.min(...xPoints2);
+        topLeftY = Math.min(...yPoints2);
+        bottomRightX = Math.max(...xPoints2);
+        bottomRightY = Math.max(...yPoints2);
+        break
+      case 'path':
+        const pathCoords = getCoords(attributes.d!)
+        console.log('pathCoords: ', pathCoords)
+        topLeftX = pathCoords.minX
+        topLeftY = pathCoords.minY
+        bottomRightX = pathCoords.maxX
+        bottomRightY = pathCoords.maxY
+        break
+      case 'text':
+        const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
+        const textSizes = getTextSizes(textContent!, attributes['font-size']!, attributes['font-family']!, attributes['font-size-adjust']!);
+        const textWidth = Math.round(textSizes.width);
+        const textHeight = Math.round(textSizes.height);
+        topLeftX = parseInt(attributes.x!)
+        topLeftY = parseInt(attributes.y!) - (textHeight * DEFAULT_TEXT_ASCENDING)
+        bottomRightX = parseInt(attributes.x!) + textWidth
+        bottomRightY = parseInt(attributes.y!) + (textHeight * (1 - DEFAULT_TEXT_ASCENDING))
+        break
+      default:
+        break
+    }
+    return { tlx: topLeftX, tly: topLeftY, brx: bottomRightX, bry: bottomRightY }
+  }
+
+  const handleSVGChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setSvgString(e.target.value)
+  }
+
 
   useEffect(() => {
-    return;
-  }, [svgElements])
+    console.log('elementCoordinates: ', elementCoordinates)
+  }, [elementCoordinates])
 
 
   const addToCanvas = (ctx: CanvasRenderingContext2D, element: Element, attributes: Attributes) => {
@@ -320,7 +430,7 @@ const App = () => {
       //     const textWidth = Math.round(textSizes.width);
       //     const textHeight = Math.round(textSizes.height);
 
-      //     console.log('textWidth: ', textWidth, 'textHeight: ', textHeight, 'textX: ', parseInt(attributes.x), 'textY: ', parseInt(attributes.y) + (parseInt(attributes['font-size']) * index))
+      //     // console.log('textWidth: ', textWidth, 'textHeight: ', textHeight, 'textX: ', parseInt(attributes.x), 'textY: ', parseInt(attributes.y) + (parseInt(attributes['font-size']) * index))
       //     ctx.strokeStyle = 'red'
       //     ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) + (parseInt(attributes['font-size']) * index), textWidth, textHeight)
       //   })
@@ -338,10 +448,16 @@ const App = () => {
     const svgChildren = [...svg.children[0].children];
     setSvgElements(svgChildren)
 
-
     svgChildren.forEach((element) => {
       const attributes = getAttributes(element)
       addToCanvas(ctx, element, attributes)
+
+      // calculate the top left and bottom right coordinates of each element
+      const coordinates = calculateTopLeftBottomRight(element)
+      setElementCoordinates((prev) => {
+        if (!prev) return [coordinates]
+        return [...prev, coordinates]
+      })
     })
   }
 
@@ -349,6 +465,10 @@ const App = () => {
     const ctx = canvas?.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas?.width ?? DEFAULT_CANVAS_WIDTH, canvas?.height ?? DEFAULT_CANVAS_HEIGHT);
+
+    setSvgElements(null)
+    setActiveElement(null)
+    setElementCoordinates(null)
   }
 
   const handleCanvasClick = (e: MouseEvent) => {
@@ -358,11 +478,7 @@ const App = () => {
     const elArrLength = svgElements?.length ?? 0
 
     for (let i = elArrLength - 1; i >= 0; i--) {
-      // if the active element is the same as the clicked element, break
-      // if (activeElement === svgElements![i]) {
-      //   console.log('activeElement clicked')
-      //   break;
-      // }
+      if (activeElement === svgElements![i]) break;
 
       const clickedElement = containsMouse(svgElements![i], mouseX, mouseY);
       if (clickedElement) break;
@@ -371,12 +487,12 @@ const App = () => {
 
   useEffect(() => {
     if (!activeElement) return;
-    console.log('activeElement: ', activeElement)
+    // console.log('activeElement: ', activeElement)
     // setEditable(getAttributes(activeElement!))
   }, [activeElement])
 
   // useEffect(() => {
-  //   console.log('editable: ', editable)
+  //   // console.log('editable: ', editable)
   // }, [editable])
 
   useEffect(() => {
