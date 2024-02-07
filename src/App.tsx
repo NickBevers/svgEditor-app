@@ -1,6 +1,6 @@
 import './App.css'
 import React, { useEffect, useState } from 'react'
-import { getCoords } from './PathHelpers';
+import { getCoords, calculateLowestYValue } from './PathHelpers';
 
 `
 <svg
@@ -20,6 +20,14 @@ import { getCoords } from './PathHelpers';
         A 20,20 0,0,1 90,30
         Q 90,60 50,90
         Q 10,60 10,30 z" />
+    <line x1="0" y1="15" x2="1000" y2="15" stroke="red" />
+    <path
+      fill="purple"
+      d="M 60,80
+        A 20,20 0,0,1 100,80
+        A 20,20 0,0,1 140,80
+        Q 140,110 100,140
+        Q 60,110 60,80 z" />
   <polygon points="200,10 250,190 150,190" fill="lime" />
 </svg>
 `
@@ -261,6 +269,8 @@ const App = () => {
     
     return attributeObject
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const calculateTopLeftBottomRight = (element: Element) => {
     const attributes: Attributes = getAttributes(element)
     const tagName = element.tagName
@@ -399,7 +409,9 @@ const App = () => {
         ctx.stroke();
         break
       case 'path':
-        const path = new Path2D(attributes.d)
+        // remove all unnecessary whitespace from the path string
+        const pathString = attributes.d?.replace(/\s+/g, ' ').trim()
+        const path = new Path2D(pathString)
         ctx.fillStyle = attributes.fill
         ctx.fill(path)
         break
@@ -446,18 +458,40 @@ const App = () => {
     
     const svg = new DOMParser().parseFromString(svgString, 'image/svg+xml')
     const svgChildren = [...svg.children[0].children];
+
+    svgChildren.forEach((element, index) => {
+      if (element.tagName === 'path') {
+        const pathString = (getAttributes(element) as Attributes).d?.replace(/\s+/g, ' ').trim()
+        svgChildren[index].setAttribute('d', pathString)
+        console.log('Lowest Y: ', calculateLowestYValue(pathString!));
+      }
+    })
+
     setSvgElements(svgChildren)
 
     svgChildren.forEach((element) => {
-      const attributes = getAttributes(element)
+      const attributes: Attributes = getAttributes(element)
+
+      if (attributes.tagName === 'path') {
+        console.log('lowestY: ', calculateLowestYValue(attributes.d!));
+        console.log('check pass');
+      }
+
       addToCanvas(ctx, element, attributes)
 
+      // calculate the lowest y value of each element
+      // console.log('attributes: ', attributes)
+      // if (attributes.tagName === 'path') {
+      //   console.log('lowestY: ', calculateLowestYValue(attributes.d!));
+      //   console.log('check pass');
+      // }
+
       // calculate the top left and bottom right coordinates of each element
-      const coordinates = calculateTopLeftBottomRight(element)
-      setElementCoordinates((prev) => {
-        if (!prev) return [coordinates]
-        return [...prev, coordinates]
-      })
+      // const coordinates = calculateTopLeftBottomRight(element)
+      // setElementCoordinates((prev) => {
+      //   if (!prev) return [coordinates]
+      //   return [...prev, coordinates]
+      // })
     })
   }
 
