@@ -1,5 +1,13 @@
-# React + TypeScript + Vite
+# SVG editor 
 
+This is a personal project of mine to create a way to edit, import and export SVG strings into an html canvas and implement it into your own projects through an easy to use API (still a WIP)
+
+
+
+
+
+
+--------------------------------------------
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
