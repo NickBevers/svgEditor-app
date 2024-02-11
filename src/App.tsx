@@ -1,6 +1,6 @@
 import './App.css'
 import React, { useEffect, useState } from 'react'
-import { extractPathCommands } from './PathHelpers';
+import { getLowestXValue, getLowestYValue } from './PathHelpers';
 
 `
 <svg
@@ -20,7 +20,6 @@ import { extractPathCommands } from './PathHelpers';
         A 20,20 0,0,1 90,30
         Q 90,60 50,90
         Q 10,60 10,30 z" />
-    <line x1="0" y1="15" x2="1000" y2="15" stroke="red" />
     <path
       fill="purple"
       d="M 60,80
@@ -132,6 +131,7 @@ const App = () => {
   const [svgString, setSvgString] = useState('')
   const [svgElements, setSvgElements] = useState<Element[] | null>(null)
   const [activeElement, setActiveElement] = useState<Element | null>(null)
+  const [activeElementOffset, setActiveElementOffset] = useState({ x: 0, y: 0 })
   // const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 })
   // const [editable, setEditable] = useState<Element | null>(null)
 
@@ -166,7 +166,7 @@ const App = () => {
     const boundingBox = textElement.getBoundingClientRect();
     document.body.removeChild(svg);
     return { width: bbox.width, height: bbox.height, bWidth: boundingBox.width, bHeight: boundingBox.height};
-}
+  }
 
   const containsMouse = (element: Element, mouseX: number, mouseY: number) => {
     const attributes :SVGAttributes = getAttributes(element);
@@ -180,8 +180,11 @@ const App = () => {
         const height = parseInt(attributes.height!);
       
         if (mouseX > x && mouseX < (x + width) && mouseY > y && mouseY < (y + height)) {
-          console.log('rect clicked');
+          // console.log('rect clicked');
           setActiveElement(element);
+          const offsetX = mouseX - x
+          const offsetY = mouseY - y
+          setActiveElementOffset({ x: offsetX, y: offsetY })
           return true;
         }
         break
@@ -190,8 +193,11 @@ const App = () => {
         const cy = parseInt(attributes.cy!);
         const r = parseInt(attributes.r!);
         if (Math.sqrt((mouseX - cx) ** 2 + (mouseY - cy) ** 2) < r) {
-          console.log('circle clicked');
+          // console.log('circle clicked');
           setActiveElement(element);
+          const offsetX = mouseX - cx
+          const offsetY = mouseY - cy
+          setActiveElementOffset({ x: offsetX, y: offsetY })
           return true;
         }
         break
@@ -201,8 +207,11 @@ const App = () => {
         const rx = parseInt(attributes.rx!);
         const ry = parseInt(attributes.ry!);
         if (Math.sqrt((mouseX - cx2) ** 2 / rx ** 2 + (mouseY - cy2) ** 2 / ry ** 2) < 1) {
-          console.log('ellipse clicked');
+          // console.log('ellipse clicked');
           setActiveElement(element);
+          const offsetX = mouseX - cx2
+          const offsetY = mouseY - cy2
+          setActiveElementOffset({ x: offsetX, y: offsetY })
           return true;
         }
         break
@@ -213,8 +222,11 @@ const App = () => {
         const y2 = parseInt(attributes.y2!)
 
         if (mouseX > x1 && mouseX < x2 && mouseY > y1 && mouseY < y2) {
-          console.log('line clicked');
+          // console.log('line clicked');
           setActiveElement(element);
+          const offsetX = mouseX - x1
+          const offsetY = mouseY - y1
+          setActiveElementOffset({ x: offsetX, y: offsetY })
           return true;
         }
         break
@@ -227,8 +239,11 @@ const App = () => {
         const minY = Math.min(...yPoints)
         const maxY = Math.max(...yPoints)
         if (mouseX > minX && mouseX < maxX && mouseY > minY && mouseY < maxY) {
-          console.log('polyline clicked');
+          // console.log('polyline clicked');
           setActiveElement(element);
+          const offsetX = mouseX - minX
+          const offsetY = mouseY - minY
+          setActiveElementOffset({ x: offsetX, y: offsetY })
           return true;
         }
         break
@@ -241,16 +256,25 @@ const App = () => {
         const minY2 = Math.min(...yPoints2);
         const maxY2 = Math.max(...yPoints2);
         if (mouseX > minX2 && mouseX < maxX2 && mouseY > minY2 && mouseY < maxY2) {
-          console.log('polygon clicked');
+          // console.log('polygon clicked');
           setActiveElement(element);
+          const offsetX = mouseX - minX2
+          const offsetY = mouseY - minY2
+          setActiveElementOffset({ x: offsetX, y: offsetY })
           return true;
         }
         break
       case 'path':
         const path = new Path2D(attributes.d!)
         if (canvas?.getContext('2d')?.isPointInPath(path, mouseX, mouseY)) {
-          console.log('path clicked');
+          // console.log('path clicked');
           setActiveElement(element);
+
+          // get the lowest x and y values of the path
+          const offsetX = mouseX - getLowestXValue(attributes.d!)
+          const offsetY = mouseY - getLowestYValue(attributes.d!)
+          setActiveElementOffset({ x: offsetX, y: offsetY })
+
           return true;
         }
         break
@@ -262,14 +286,14 @@ const App = () => {
         const textX = parseInt(attributes.x!)
         const textY = parseInt(attributes.y!)
         if (mouseX > textX && mouseX < (textX + textWidth) && mouseY > (textY - (textHeight * DEFAULT_TEXT_ASCENDING)) && mouseY < (textY + (textHeight * (1 - DEFAULT_TEXT_ASCENDING)))) {
-          console.log('text clicked');
+          // console.log('text clicked');
           setActiveElement(element);
           return true;
         }
         break
-        default:
-          setActiveElement(null);
-          return false;
+      default:
+        setActiveElement(null);
+        return false;
         break
     }
   }
@@ -395,7 +419,6 @@ const App = () => {
       if (element.tagName === 'path') {
         const pathString = (getAttributes(element) as Attributes).d?.replace(/\s+/g, ' ').trim()
         svgChildren[index].setAttribute('d', pathString)
-        console.log('Dissection: ', extractPathCommands(pathString!));
       }
     })
 
@@ -403,22 +426,7 @@ const App = () => {
 
     svgChildren.forEach((element) => {
       const attributes: Attributes = getAttributes(element)
-
       addToCanvas(ctx, element, attributes)
-
-      // calculate the lowest y value of each element
-      // console.log('attributes: ', attributes)
-      // if (attributes.tagName === 'path') {
-      //   console.log('lowestY: ', calculateLowestYValue(attributes.d!));
-      //   console.log('check pass');
-      // }
-
-      // calculate the top left and bottom right coordinates of each element
-      // const coordinates = calculateTopLeftBottomRight(element)
-      // setElementCoordinates((prev) => {
-      //   if (!prev) return [coordinates]
-      //   return [...prev, coordinates]
-      // })
     })
   }
 
@@ -432,22 +440,86 @@ const App = () => {
     // setElementCoordinates(null)
   }
 
+  const moveElement = (element: Element, x: number, y: number) => {
+    const attributes: Attributes = getAttributes(element)
+    const tagName = element.tagName
+    x = x - activeElementOffset.x
+    y = y - activeElementOffset.y
+
+    switch (tagName) {
+      case 'rect':
+        console.log('rect moving');
+        element.setAttribute('x', x.toString())
+        element.setAttribute('y', y.toString())
+        break
+      case 'circle':
+        element.setAttribute('cx', x.toString())
+        element.setAttribute('cy', y.toString())
+        break
+      case 'ellipse':
+        element.setAttribute('cx', x.toString())
+        element.setAttribute('cy', y.toString())
+        break
+      case 'line':
+        element.setAttribute('x1', x.toString())
+        element.setAttribute('y1', y.toString())
+        break
+      case 'polyline':
+        const points = attributes.points.split(' ').map(point => point.split(',').map(Number))
+        const xPoints = points.map(point => point[0])
+        const yPoints = points.map(point => point[1])
+        const minX = Math.min(...xPoints)
+        const minY = Math.min(...yPoints)
+        const xDiff = x - minX
+        const yDiff = y - minY
+        const newPoints = points.map(point => [point[0] + xDiff, point[1] + yDiff])
+        const newPointsString = newPoints.map(point => point.join(',')).join(' ')
+        element.setAttribute('points', newPointsString)
+        break
+      case 'polygon':
+        const points2 = attributes.points.split(' ').map(point => point.split(',').map(Number))
+        const xPoints2 = points2.map(point => point[0])
+        const yPoints2 = points2.map(point => point[1])
+        const minX2 = Math.min(...xPoints2)
+        const minY2 = Math.min(...yPoints2)
+        const xDiff2 = x - minX2
+        const yDiff2 = y - minY2
+        const newPoints2 = points2.map(point => [point[0] + xDiff2, point[1] + yDiff2])
+        const newPointsString2 = newPoints2.map(point => point.join(',')).join(' ')
+        element.setAttribute('points', newPointsString2)
+        break
+      case 'path':
+        
+        break
+      case 'text':
+        element.setAttribute('x', x.toString())
+        element.setAttribute('y', y.toString())
+        break
+      default:
+        break
+    }
+
+    const ctx = canvas?.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas?.width ?? DEFAULT_CANVAS_WIDTH, canvas?.height ?? DEFAULT_CANVAS_HEIGHT);
+    svgElements?.forEach((element) => {
+      const attributes: Attributes = getAttributes(element)
+      addToCanvas(ctx, element, attributes)
+    })
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleMouseMove = (e: MouseEvent) => {
     if (!activeElement) return;
     const ctx = canvas?.getContext('2d')
     if (!ctx) return;
-    console.log('mouse moved');
 
     // get the x and y offset and update the position of the active element
     const offsetX = e.offsetX
     const offsetY = e.offsetY
-    const attributes = getAttributes(activeElement)
-    const tagName = activeElement.tagName
 
-    console.log('tagName: ', tagName, 'attributes: ', attributes, 'offsetX: ', offsetX, 'offsetY: ', offsetY)
-
-    // create a move function for each element type
+    // move the element to the offset
+    moveElement(activeElement, offsetX, offsetY)
   }
 
   const handleCanvasClick = (e: MouseEvent) => {
@@ -469,7 +541,7 @@ const App = () => {
         }
 
         setActiveElement(element)
-        console.log('activeElement: ', element)
+        // console.log('activeElement: ', element)
         return;
       } else {
         setActiveElement(null)
@@ -484,9 +556,8 @@ const App = () => {
   }, [activeElement])
 
   useEffect(() => {
-    const ctx = canvas?.getContext('2d');
-    if (!ctx) return;
-
+    if (!canvas || !svgElements) return;
+    
     canvas?.addEventListener('mousemove', (e) => {
       setMouseX(e.offsetX)
       setMouseY(e.offsetY)
