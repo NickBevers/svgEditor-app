@@ -1,7 +1,6 @@
 import './App.css'
 import React, { useEffect, useState } from 'react'
-import { getLowestXValue, getLowestYValue } from './PathHelpers';
-
+import { getLowestXValue, getLowestYValue, movePath } from './PathHelpers';
 `
 <svg
   viewBox="0 0 600 600"
@@ -42,18 +41,29 @@ import { getLowestXValue, getLowestYValue } from './PathHelpers';
   - on mouseup, set the active element to null
 
 
-*/
+  FOR DRAGGING ELEMENTS:
+  - Add an event listener for mousedown on the canvas
+  - On mousedown, check if the mouse is over an element
+  - If it is, set that element as the active element and set the mouse position as the offset from the top left of the element
+  - Add an event listener for mousemove on the canvas
+  - on mousemove, if an element is active, update the position of the element to the mouse position minus the offset
+  - Add an event listener for mouseup on the canvas
+  - on mouseup, set the active element to null
 
-/*
+  other possible solution for dragging elements
+  - add an event listener for mousedown on the canvas
+  - on mousedown, check if the mouse is over an element
+  - if it is, set that element as the active element and set the mouse position as the offset from the top left of the element
+  - add an event listener for mousemove on the canvas
+  - on mousemove, if an element is active, update the position of the element to the mouse position minus the offset
+  - add an event listener for mouseup on the canvas
+  - on mouseup, cancel the event listener for mousemove
 
-FOR DRAGGING ELEMENTS:
-- Add an event listener for mousedown on the canvas
-- On mousedown, check if the mouse is over an element
-- If it is, set that element as the active element and set the mouse position as the offset from the top left of the element
-- Add an event listener for mousemove on the canvas
-- on mousemove, if an element is active, update the position of the element to the mouse position minus the offset
-- Add an event listener for mouseup on the canvas
-- on mouseup, set the active element to null
+  is it possible to move the element with absolute positioning?
+  - get the x and y coordinates of the element
+  - set the x and y coordinates of the element to the mouse position minus the offset
+  - if the element is a path, update the d attribute with the new x and y coordinates
+
 
 */
 
@@ -117,27 +127,14 @@ interface Attributes {
   [key: string]: string
 }
 
-// interface Coordinates {
-//   // top left
-//   tlx: number;
-//   tly: number;
-//   // bottom right
-//   brx: number;
-//   bry: number;
-// }
-
 const App = () => {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [svgString, setSvgString] = useState('')
   const [svgElements, setSvgElements] = useState<Element[] | null>(null)
   const [activeElement, setActiveElement] = useState<Element | null>(null)
   const [activeElementOffset, setActiveElementOffset] = useState({ x: 0, y: 0 })
-  // const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 })
-  // const [editable, setEditable] = useState<Element | null>(null)
-
-  // creat a state to hold an object for each element in the svg with the top left and bottom right coordinates
-  // const [elementCoordinates, setElementCoordinates] = useState<Coordinates[] | null>(null)
-
+  const [movingEventListeners, setMovingEventListeners] = useState(false)
+  
   const [mouseX, setMouseX] = useState(0)
   const [mouseY, setMouseY] = useState(0)
 
@@ -151,22 +148,38 @@ const App = () => {
     setCanvas(canvas ?? null)
   }, [])
 
-  const getTextSizes = (text: string, fontSize: string, fontName: string, fontAspectRatio: string) => {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  // const getTextSizes = (text: string, fontSize: string, fontName: string, fontAspectRatio: string) => {
+  //   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  //   const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
 
-    textElement.setAttribute("font-size", fontSize);
-    textElement.setAttribute("font-family", fontName);
-    textElement.setAttribute("font-size-adjust", fontAspectRatio);
-    textElement.textContent = text;
+  //   textElement.setAttribute("font-size", fontSize);
+  //   textElement.setAttribute("font-family", fontName);
+  //   textElement.setAttribute("font-size-adjust", fontAspectRatio);
+  //   textElement.textContent = text;
 
-    svg.appendChild(textElement);
-    document.body.appendChild(svg);
-    const bbox = textElement.getBBox();
-    const boundingBox = textElement.getBoundingClientRect();
-    document.body.removeChild(svg);
-    return { width: bbox.width, height: bbox.height, bWidth: boundingBox.width, bHeight: boundingBox.height};
-  }
+  //   svg.appendChild(textElement);
+  //   document.body.appendChild(svg);
+  //   const bbox = textElement.getBBox();
+  //   const boundingBox = textElement.getBoundingClientRect();
+  //   document.body.removeChild(svg);
+  //   return { width: bbox.width, height: bbox.height, bWidth: boundingBox.width, bHeight: boundingBox.height};
+  // }
+
+  const getTextSizes = (
+    text: string,
+    fontSize: string,
+    fontName: string,
+  ) => {
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) return { width: 0, height: 0 };
+
+    ctx.font = `${fontSize}px ${fontName}`;
+    const width = ctx.measureText(text).width;
+    const height = parseInt(fontSize);
+
+    console.log('width: ', width, 'height: ', height)
+    return { width, height };
+  };
 
   const containsMouse = (element: Element, mouseX: number, mouseY: number) => {
     const attributes :SVGAttributes = getAttributes(element);
@@ -280,7 +293,7 @@ const App = () => {
         break
       case 'text':
         const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
-        const textSizes = getTextSizes(textContent!, attributes['font-size']!, attributes['font-family']!, attributes['font-size-adjust']!);
+        const textSizes = getTextSizes(textContent!, attributes['font-size']!, attributes['font-family']!);
         const textWidth = Math.round(textSizes.width);
         const textHeight = Math.round(textSizes.height);
         const textX = parseInt(attributes.x!)
@@ -288,6 +301,12 @@ const App = () => {
         if (mouseX > textX && mouseX < (textX + textWidth) && mouseY > (textY - (textHeight * DEFAULT_TEXT_ASCENDING)) && mouseY < (textY + (textHeight * (1 - DEFAULT_TEXT_ASCENDING)))) {
           // console.log('text clicked');
           setActiveElement(element);
+
+          // calculate the offset of the mouse from the top left of the text, but keep in mind that the text is drawn from the bottom left
+          const offsetX = mouseX - textX
+          const offsetY = mouseY - textY
+          setActiveElementOffset({ x: offsetX, y: offsetY })
+
           return true;
         }
         break
@@ -376,33 +395,25 @@ const App = () => {
         ctx.font = `${attributes['font-size']}px ${attributes['font-family']}`
         ctx.fillStyle = attributes.fill
         ctx.fillText(textContent!, parseInt(attributes.x), parseInt(attributes.y))
-
-        const textSizes = getTextSizes(textContent!, attributes['font-size']!, attributes['font-family']!, attributes['font-size-adjust']!);
-        const textWidth = Math.round(textSizes.width);
-        const textHeight = Math.round(textSizes.height);
-        
-        ctx.strokeStyle = 'red'
-        ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) - (textHeight * DEFAULT_TEXT_ASCENDING), textWidth, textHeight)
-        // ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) - textHeight, textWidth, parseInt(attributes.y))
         break
-      // case 'multiLineText':
-      //   // clean up the text content and split it into lines
-      //   const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
-      //   const textLines = textContent?.split('\n')
-      //   textLines?.forEach((line, index) => {
-      //     ctx.font = `${attributes['font-size']}px ${attributes['font-family']}`
-      //     ctx.fillStyle = attributes.fill
-      //     ctx.fillText(line, parseInt(attributes.x), parseInt(attributes.y) + (parseInt(attributes['font-size']) * (index + 1)))
+      case 'multiLineText':
+        // clean up the text content and split it into lines
+        const multiTextContent = element.textContent?.replace(/\s+/g, ' ').trim()
+        const textLines = multiTextContent?.split('\n')
+        textLines?.forEach((line, index) => {
+          ctx.font = `${attributes['font-size']}px ${attributes['font-family']}`
+          ctx.fillStyle = attributes.fill
+          ctx.fillText(line, parseInt(attributes.x), parseInt(attributes.y) + (parseInt(attributes['font-size']) * (index + 1)))
 
-      //     const textSizes = getTextSizes(line, attributes['font-size']!, attributes['font-family']!, attributes['font-size-adjust']!);
-      //     const textWidth = Math.round(textSizes.width);
-      //     const textHeight = Math.round(textSizes.height);
+          const textSizes = getTextSizes(line, attributes['font-size']!, attributes['font-family']!);
+          const textWidth = Math.round(textSizes.width);
+          const textHeight = Math.round(textSizes.height);
 
-      //     // console.log('textWidth: ', textWidth, 'textHeight: ', textHeight, 'textX: ', parseInt(attributes.x), 'textY: ', parseInt(attributes.y) + (parseInt(attributes['font-size']) * index))
-      //     ctx.strokeStyle = 'red'
-      //     ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) + (parseInt(attributes['font-size']) * index), textWidth, textHeight)
-      //   })
-      //   break
+          // console.log('textWidth: ', textWidth, 'textHeight: ', textHeight, 'textX: ', parseInt(attributes.x), 'textY: ', parseInt(attributes.y) + (parseInt(attributes['font-size']) * index))
+          ctx.strokeStyle = 'red'
+          ctx.strokeRect(parseInt(attributes.x), parseInt(attributes.y) + (parseInt(attributes['font-size']) * index), textWidth, textHeight)
+        })
+        break
       default:
         break
     }
@@ -448,7 +459,6 @@ const App = () => {
 
     switch (tagName) {
       case 'rect':
-        console.log('rect moving');
         element.setAttribute('x', x.toString())
         element.setAttribute('y', y.toString())
         break
@@ -489,7 +499,7 @@ const App = () => {
         element.setAttribute('points', newPointsString2)
         break
       case 'path':
-        
+        movePath(attributes.d!, x, y)
         break
       case 'text':
         element.setAttribute('x', x.toString())
@@ -499,6 +509,25 @@ const App = () => {
         break
     }
 
+    resetCanvas()
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!activeElement) return;
+    const offsetX = e.offsetX
+    const offsetY = e.offsetY
+    
+    // setTimeout(() => {
+    //   console.log('moving at frame rate')
+    //   moveElement(activeElement!, offsetX, offsetY)
+    // }, frameTime)
+
+    // move the element to the offset
+    moveElement(activeElement, offsetX, offsetY)
+  }
+
+  const resetCanvas = () => {
     const ctx = canvas?.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas?.width ?? DEFAULT_CANVAS_WIDTH, canvas?.height ?? DEFAULT_CANVAS_HEIGHT);
@@ -508,46 +537,41 @@ const App = () => {
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!activeElement) return;
-    const ctx = canvas?.getContext('2d')
-    if (!ctx) return;
-
-    // get the x and y offset and update the position of the active element
-    const offsetX = e.offsetX
-    const offsetY = e.offsetY
-
-    // move the element to the offset
-    moveElement(activeElement, offsetX, offsetY)
+  const handleMouseUp = () => {
+    canvas?.removeEventListener('mousemove', handleMouseMove)
+    setMovingEventListeners(false)
+    // clearCanvas() TODO: rework the move function so it updates the svg elements array
+    loadSvg()
   }
 
   const handleCanvasClick = (e: MouseEvent) => {
-    const mouseX = e.offsetX
-    const mouseY = e.offsetY
+    const mouseX = e.offsetX;
+    const mouseY = e.offsetY;
 
-    const elArrLength = svgElements?.length ?? 0
+    const elArrLength = svgElements ? svgElements.length : 0;
 
     for (let i = elArrLength - 1; i >= 0; i--) {
-      const element = svgElements![i]
+      const element = svgElements![i];
       if (containsMouse(element, mouseX, mouseY)) {
-        // the element should be the active element
-        // if the element is already the active element, add an event listener for mousemove on the canvas
-        if (element === activeElement) {
-          canvas?.addEventListener('mousemove', handleMouseMove)
-          canvas?.addEventListener('mouseup', () => {
-            canvas?.removeEventListener('mousemove', handleMouseMove)
-          })
+        if (!activeElement || element !== activeElement) {
+          setActiveElement(element);
+          return;
         }
 
-        setActiveElement(element)
-        // console.log('activeElement: ', element)
+        if (element === activeElement && !movingEventListeners) {
+          setMovingEventListeners(true);
+          canvas?.addEventListener('mousemove', handleMouseMove);
+          canvas?.addEventListener('mouseup', handleMouseUp, { once: true });
+        } else {
+          setActiveElement(null);
+          setMovingEventListeners(false);
+          resetCanvas();
+        }
         return;
-      } else {
-        setActiveElement(null)
       }
     }
   }
+  
 
   useEffect(() => {
     if (!activeElement) return;
@@ -564,6 +588,11 @@ const App = () => {
     })
 
     canvas?.addEventListener('mousedown', handleCanvasClick, {once: true})
+    // canvas?.addEventListener('mousemove', handleMouseMove)
+    // canvas?.addEventListener('mouseup', () => {
+    //   canvas?.removeEventListener('mousemove', handleMouseMove)
+    //   resetCanvas()
+    // })
 
   }, [canvas, containsMouse, svgElements])
 
