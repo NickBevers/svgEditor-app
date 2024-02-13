@@ -127,6 +127,13 @@ interface Attributes {
   [key: string]: string
 }
 
+interface SvgElementCoordinates {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 const App = () => {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [svgString, setSvgString] = useState('')
@@ -134,12 +141,13 @@ const App = () => {
   const [activeElement, setActiveElement] = useState<Element | null>(null)
   const [activeElementOffset, setActiveElementOffset] = useState({ x: 0, y: 0 })
   const [movingEventListeners, setMovingEventListeners] = useState(false)
+  const [svgElementCoordinates, setElementCoordinates] = useState< SvgElementCoordinates[] | null>(null)
   
   const [mouseX, setMouseX] = useState(0)
   const [mouseY, setMouseY] = useState(0)
 
-  const DEFAULT_CANVAS_WIDTH = 5000
-  const DEFAULT_CANVAS_HEIGHT = 5000
+  const DEFAULT_CANVAS_WIDTH = 1000
+  const DEFAULT_CANVAS_HEIGHT = 1000
   const DEFAULT_TEXT_ASCENDING = 0.75
 
   // get the canvas element and set it to the canvas state on mount
@@ -147,23 +155,6 @@ const App = () => {
     const canvas: HTMLCanvasElement = document.getElementById('svgCanvas') as HTMLCanvasElement
     setCanvas(canvas ?? null)
   }, [])
-
-  // const getTextSizes = (text: string, fontSize: string, fontName: string, fontAspectRatio: string) => {
-  //   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  //   const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
-
-  //   textElement.setAttribute("font-size", fontSize);
-  //   textElement.setAttribute("font-family", fontName);
-  //   textElement.setAttribute("font-size-adjust", fontAspectRatio);
-  //   textElement.textContent = text;
-
-  //   svg.appendChild(textElement);
-  //   document.body.appendChild(svg);
-  //   const bbox = textElement.getBBox();
-  //   const boundingBox = textElement.getBoundingClientRect();
-  //   document.body.removeChild(svg);
-  //   return { width: bbox.width, height: bbox.height, bWidth: boundingBox.width, bHeight: boundingBox.height};
-  // }
 
   const getTextSizes = (
     text: string,
@@ -181,10 +172,14 @@ const App = () => {
     return { width, height };
   };
 
-  const containsMouse = (element: Element, mouseX: number, mouseY: number) => {
+  const containsMouse = (element: Element, index: number, mouseX: number, mouseY: number) => {
     const attributes :SVGAttributes = getAttributes(element);
     const tagName = element.tagName;
 
+    // TODO: Change this function to use the svgElementCoordinates state to check if the mouse is within the bounds of the element
+    const elementCoordinates = svgElementCoordinates![index];
+    console.log('elementCoordinates: ', elementCoordinates)
+ 
     switch (tagName) {
       case 'rect':
         const x = parseInt(attributes.x!);
@@ -418,6 +413,13 @@ const App = () => {
         break
     }
   }
+
+  const calculateElementCoordinates = (element: Element, attributes: Attributes) => {
+    console.log('calculating element coordinates')
+    console.log('element: ', element, 'attributes: ', attributes)
+    // TODO: create a switch statement that calculates the coordinates of the element and sets the svgElementCoordinates state
+    setElementCoordinates([{ x: 0, y: 0, width: 0, height: 0 }]) // TODO: remove this line and replace it with the switch statement
+  }
   
   const loadSvg = () => {
     const ctx = canvas?.getContext('2d')
@@ -437,6 +439,7 @@ const App = () => {
 
     svgChildren.forEach((element) => {
       const attributes: Attributes = getAttributes(element)
+      calculateElementCoordinates(element, attributes)
       addToCanvas(ctx, element, attributes)
     })
   }
@@ -540,8 +543,9 @@ const App = () => {
   const handleMouseUp = () => {
     canvas?.removeEventListener('mousemove', handleMouseMove)
     setMovingEventListeners(false)
+    resetCanvas()
     // clearCanvas() TODO: rework the move function so it updates the svg elements array
-    loadSvg()
+    // loadSvg()
   }
 
   const handleCanvasClick = (e: MouseEvent) => {
@@ -552,7 +556,7 @@ const App = () => {
 
     for (let i = elArrLength - 1; i >= 0; i--) {
       const element = svgElements![i];
-      if (containsMouse(element, mouseX, mouseY)) {
+      if (containsMouse(element, i, mouseX, mouseY)) {
         if (!activeElement || element !== activeElement) {
           setActiveElement(element);
           return;
