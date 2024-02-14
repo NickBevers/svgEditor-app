@@ -1,6 +1,6 @@
 import './App.css'
 import React, { useEffect, useState } from 'react'
-import { getLowestXValue, getLowestYValue, movePath } from './PathHelpers';
+import { getHighestXValue, getHighestYValue, getLowestXValue, getLowestYValue, movePath } from './PathHelpers';
 `
 <svg
   viewBox="0 0 600 600"
@@ -141,7 +141,7 @@ const App = () => {
   const [activeElement, setActiveElement] = useState<Element | null>(null)
   const [activeElementOffset, setActiveElementOffset] = useState({ x: 0, y: 0 })
   const [movingEventListeners, setMovingEventListeners] = useState(false)
-  const [svgElementCoordinates, setElementCoordinates] = useState< SvgElementCoordinates[] | null>(null)
+  const [svgElementCoordinates, setSvgElementCoordinates] = useState< SvgElementCoordinates[] | null>(null)
   
   const [mouseX, setMouseX] = useState(0)
   const [mouseY, setMouseY] = useState(0)
@@ -418,7 +418,79 @@ const App = () => {
     console.log('calculating element coordinates')
     console.log('element: ', element, 'attributes: ', attributes)
     // TODO: create a switch statement that calculates the coordinates of the element and sets the svgElementCoordinates state
-    setElementCoordinates([{ x: 0, y: 0, width: 0, height: 0 }]) // TODO: remove this line and replace it with the switch statement
+    const tagName = element.tagName
+    switch (tagName) {
+      case 'rect':
+        const x = parseInt(attributes.x!)
+        const y = parseInt(attributes.y!)
+        const width = parseInt(attributes.width!)
+        const height = parseInt(attributes.height!)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x, y, width, height }])
+        break
+      case 'circle':
+        const cx = parseInt(attributes.cx!)
+        const cy = parseInt(attributes.cy!)
+        const r = parseInt(attributes.r!)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: cx - r, y: cy - r, width: r * 2, height: r * 2 }])
+        break
+      case 'ellipse':
+        const cx2 = parseInt(attributes.cx!)
+        const cy2 = parseInt(attributes.cy!)
+        const rx = parseInt(attributes.rx!)
+        const ry = parseInt(attributes.ry!)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: cx2 - rx, y: cy2 - ry, width: rx * 2, height: ry * 2 }])
+        break
+      case 'line':
+        const x1 = parseInt(attributes.x1!)
+        const y1 = parseInt(attributes.y1!)
+        const x2 = parseInt(attributes.x2!)
+        const y2 = parseInt(attributes.y2!)
+        const lineMinX = Math.min(x1, x2)
+        const lineMinY = Math.min(y1, y2)
+        const lineMaxX = Math.max(x1, x2)
+        const lineMaxY = Math.max(y1, y2)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: lineMinX, y: lineMinY, width: lineMaxX - lineMinX, height: lineMaxY - lineMinY }])
+        break
+      case 'polyline':
+        const points = attributes.points.split(' ').map(point => point.split(',').map(Number))
+        const xPoints = points.map(point => point[0])
+        const yPoints = points.map(point => point[1])
+        const minX = Math.min(...xPoints)
+        const minY = Math.min(...yPoints)
+        const maxX = Math.max(...xPoints)
+        const maxY = Math.max(...yPoints)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: minX, y: minY, width: maxX - minX, height: maxY - minY }])
+        break
+      case 'polygon':
+        const points2 = attributes.points.split(' ').map(point => point.split(',').map(Number))
+        const xPoints2 = points2.map(point => point[0])
+        const yPoints2 = points2.map(point => point[1])
+        const minX2 = Math.min(...xPoints2)
+        const minY2 = Math.min(...yPoints2)
+        const maxX2 = Math.max(...xPoints2)
+        const maxY2 = Math.max(...yPoints2)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: minX2, y: minY2, width: maxX2 - minX2, height: maxY2 - minY2 }])
+        break
+      case 'path':
+        const pathString = attributes.d!
+        const pathMinX = getLowestXValue(pathString)
+        const pathMinY = getLowestYValue(pathString)
+        const pathMaxX = getHighestXValue(pathString)
+        const pathMaxY = getHighestYValue(pathString)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: pathMinX, y: pathMinY, width: pathMaxX - pathMinX, height: pathMaxY - pathMinY }])
+        break
+      case 'text':
+        const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
+        const textSizes = getTextSizes(textContent!, attributes['font-size']!, attributes['font-family']!);
+        const textWidth = Math.round(textSizes.width);
+        const textHeight = Math.round(textSizes.height);
+        const textX = parseInt(attributes.x!)
+        const textY = parseInt(attributes.y!)
+        setSvgElementCoordinates([...svgElementCoordinates!, { x: textX, y: textY, width: textWidth, height: textHeight }])
+        break
+      default:
+        break
+    }
   }
   
   const loadSvg = () => {
