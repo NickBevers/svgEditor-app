@@ -75,3 +75,23 @@ export const getLowestYValue = (pathString: string): number => {
   }).flat();
   return Math.min(...yCoords);
 }
+
+export const getHighestXValue = (pathString: string): number => {
+  const pathCommands = extractPathCommands(pathString);
+  const xCoords = Object.entries(pathCommands).map(([type, coords]) => {
+    if (type.toUpperCase() === 'Z') return 0;
+    const indexes = pathCommandIndexes[type.toUpperCase()];
+    return coords.filter((_, i) => indexes.x.includes(i));
+  }).flat();
+  return Math.max(...xCoords);
+}
+
+export const getHighestYValue = (pathString: string): number => {
+  const pathCommands = extractPathCommands(pathString);
+  const yCoords = Object.entries(pathCommands).map(([type, coords]) => {
+    if (type.toUpperCase() === 'Z') return 0;
+    const indexes = pathCommandIndexes[type.toUpperCase()];
+    return coords.filter((_, i) => indexes.y.includes(i));
+  }).flat();
+  return Math.max(...yCoords);
+}
