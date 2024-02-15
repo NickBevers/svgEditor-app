@@ -141,7 +141,7 @@ const App = () => {
   const [activeElement, setActiveElement] = useState<Element | null>(null)
   const [activeElementOffset, setActiveElementOffset] = useState({ x: 0, y: 0 })
   const [movingEventListeners, setMovingEventListeners] = useState(false)
-  const [svgElementCoordinates, setSvgElementCoordinates] = useState< SvgElementCoordinates[] | null>(null)
+  const [svgElementCoordinates, setSvgElementCoordinates] = useState< SvgElementCoordinates[]>([])
   
   const [mouseX, setMouseX] = useState(0)
   const [mouseY, setMouseY] = useState(0)
