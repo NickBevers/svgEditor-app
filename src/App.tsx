@@ -67,6 +67,8 @@ import { getHighestXValue, getHighestYValue, getLowestXValue, getLowestYValue, m
 
 */
 
+type SvgElementTypes = 'rect' | 'circle' | 'ellipse' | 'line' | 'polyline' | 'polygon' | 'path' | 'text'
+
 interface SVGAttributes {
   // Presentation Attributes
   fill?: string;
@@ -128,6 +130,7 @@ interface Attributes {
 }
 
 interface SvgElementCoordinates {
+  type: SvgElementTypes;
   x: number;
   y: number;
   width: number;
@@ -139,6 +142,7 @@ const App = () => {
   const [svgString, setSvgString] = useState('')
   const [svgElements, setSvgElements] = useState<Element[] | null>(null)
   const [activeElement, setActiveElement] = useState<Element | null>(null)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [activeElementOffset, setActiveElementOffset] = useState({ x: 0, y: 0 })
   const [movingEventListeners, setMovingEventListeners] = useState(false)
   const [svgElementCoordinates, setSvgElementCoordinates] = useState< SvgElementCoordinates[]>([])
@@ -167,18 +171,12 @@ const App = () => {
     ctx.font = `${fontSize}px ${fontName}`;
     const width = ctx.measureText(text).width;
     const height = parseInt(fontSize);
-
-    console.log('width: ', width, 'height: ', height)
     return { width, height };
   };
 
   const containsMouse = (element: Element, index: number, mouseX: number, mouseY: number) => {
     const attributes :SVGAttributes = getAttributes(element);
     const tagName = element.tagName;
-
-    // TODO: Change this function to use the svgElementCoordinates state to check if the mouse is within the bounds of the element
-    const elementCoordinates = svgElementCoordinates![index];
-    console.log('elementCoordinates: ', elementCoordinates)
  
     switch (tagName) {
       case 'rect':
@@ -193,7 +191,7 @@ const App = () => {
           const offsetX = mouseX - x
           const offsetY = mouseY - y
           setActiveElementOffset({ x: offsetX, y: offsetY })
-          return true;
+          return index;
         }
         break
       case 'circle':
@@ -206,7 +204,7 @@ const App = () => {
           const offsetX = mouseX - cx
           const offsetY = mouseY - cy
           setActiveElementOffset({ x: offsetX, y: offsetY })
-          return true;
+          return index;
         }
         break
       case 'ellipse':
@@ -220,7 +218,7 @@ const App = () => {
           const offsetX = mouseX - cx2
           const offsetY = mouseY - cy2
           setActiveElementOffset({ x: offsetX, y: offsetY })
-          return true;
+          return index;
         }
         break
       case 'line':
@@ -235,7 +233,7 @@ const App = () => {
           const offsetX = mouseX - x1
           const offsetY = mouseY - y1
           setActiveElementOffset({ x: offsetX, y: offsetY })
-          return true;
+          return index;
         }
         break
       case 'polyline':
@@ -252,7 +250,7 @@ const App = () => {
           const offsetX = mouseX - minX
           const offsetY = mouseY - minY
           setActiveElementOffset({ x: offsetX, y: offsetY })
-          return true;
+          return index;
         }
         break
       case 'polygon':
@@ -269,7 +267,7 @@ const App = () => {
           const offsetX = mouseX - minX2
           const offsetY = mouseY - minY2
           setActiveElementOffset({ x: offsetX, y: offsetY })
-          return true;
+          return index;
         }
         break
       case 'path':
@@ -283,7 +281,7 @@ const App = () => {
           const offsetY = mouseY - getLowestYValue(attributes.d!)
           setActiveElementOffset({ x: offsetX, y: offsetY })
 
-          return true;
+          return index;
         }
         break
       case 'text':
@@ -302,12 +300,12 @@ const App = () => {
           const offsetY = mouseY - textY
           setActiveElementOffset({ x: offsetX, y: offsetY })
 
-          return true;
+          return index;
         }
         break
       default:
         setActiveElement(null);
-        return false;
+        return null;
         break
     }
   }
@@ -411,12 +409,12 @@ const App = () => {
         break
       default:
         break
+      }
     }
-  }
-
+    
   const calculateElementCoordinates = (element: Element, attributes: Attributes) => {
-    console.log('calculating element coordinates')
-    console.log('element: ', element, 'attributes: ', attributes)
+    console.log('element: ', element)
+    const tempSvgElementCoordinates = svgElementCoordinates;
     // TODO: create a switch statement that calculates the coordinates of the element and sets the svgElementCoordinates state
     const tagName = element.tagName
     switch (tagName) {
@@ -425,20 +423,21 @@ const App = () => {
         const y = parseInt(attributes.y!)
         const width = parseInt(attributes.width!)
         const height = parseInt(attributes.height!)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x, y, width, height }])
+        tempSvgElementCoordinates.push({ type: 'rect', x, y, width, height })
+        setSvgElementCoordinates(tempSvgElementCoordinates)
         break
       case 'circle':
         const cx = parseInt(attributes.cx!)
         const cy = parseInt(attributes.cy!)
         const r = parseInt(attributes.r!)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: cx - r, y: cy - r, width: r * 2, height: r * 2 }])
+        tempSvgElementCoordinates.push({ type: 'circle', x: cx - r, y: cy - r, width: r * 2, height: r * 2 })
         break
       case 'ellipse':
         const cx2 = parseInt(attributes.cx!)
         const cy2 = parseInt(attributes.cy!)
         const rx = parseInt(attributes.rx!)
         const ry = parseInt(attributes.ry!)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: cx2 - rx, y: cy2 - ry, width: rx * 2, height: ry * 2 }])
+        tempSvgElementCoordinates.push({ type: 'ellipse', x: cx2 - rx, y: cy2 - ry, width: rx * 2, height: ry * 2 })
         break
       case 'line':
         const x1 = parseInt(attributes.x1!)
@@ -449,7 +448,7 @@ const App = () => {
         const lineMinY = Math.min(y1, y2)
         const lineMaxX = Math.max(x1, x2)
         const lineMaxY = Math.max(y1, y2)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: lineMinX, y: lineMinY, width: lineMaxX - lineMinX, height: lineMaxY - lineMinY }])
+        tempSvgElementCoordinates.push({ type: 'line', x: lineMinX, y: lineMinY, width: lineMaxX - lineMinX, height: lineMaxY - lineMinY })
         break
       case 'polyline':
         const points = attributes.points.split(' ').map(point => point.split(',').map(Number))
@@ -459,7 +458,7 @@ const App = () => {
         const minY = Math.min(...yPoints)
         const maxX = Math.max(...xPoints)
         const maxY = Math.max(...yPoints)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: minX, y: minY, width: maxX - minX, height: maxY - minY }])
+        tempSvgElementCoordinates.push({ type: 'polyline', x: minX, y: minY, width: maxX - minX, height: maxY - minY })
         break
       case 'polygon':
         const points2 = attributes.points.split(' ').map(point => point.split(',').map(Number))
@@ -469,7 +468,7 @@ const App = () => {
         const minY2 = Math.min(...yPoints2)
         const maxX2 = Math.max(...xPoints2)
         const maxY2 = Math.max(...yPoints2)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: minX2, y: minY2, width: maxX2 - minX2, height: maxY2 - minY2 }])
+        tempSvgElementCoordinates.push({ type: 'polygon', x: minX2, y: minY2, width: maxX2 - minX2, height: maxY2 - minY2 })
         break
       case 'path':
         const pathString = attributes.d!
@@ -477,7 +476,7 @@ const App = () => {
         const pathMinY = getLowestYValue(pathString)
         const pathMaxX = getHighestXValue(pathString)
         const pathMaxY = getHighestYValue(pathString)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: pathMinX, y: pathMinY, width: pathMaxX - pathMinX, height: pathMaxY - pathMinY }])
+        tempSvgElementCoordinates.push({ type: 'path', x: pathMinX, y: pathMinY, width: pathMaxX - pathMinX, height: pathMaxY - pathMinY })
         break
       case 'text':
         const textContent = element.textContent?.replace(/\s+/g, ' ').trim()
@@ -486,7 +485,7 @@ const App = () => {
         const textHeight = Math.round(textSizes.height);
         const textX = parseInt(attributes.x!)
         const textY = parseInt(attributes.y!)
-        setSvgElementCoordinates([...svgElementCoordinates!, { x: textX, y: textY, width: textWidth, height: textHeight }])
+        tempSvgElementCoordinates.push({ type: 'text', x: textX, y: textY, width: textWidth, height: textHeight })
         break
       default:
         break
@@ -511,10 +510,21 @@ const App = () => {
 
     svgChildren.forEach((element) => {
       const attributes: Attributes = getAttributes(element)
-      calculateElementCoordinates(element, attributes)
       addToCanvas(ctx, element, attributes)
     })
   }
+
+  useEffect(() => {
+    if (!svgElements) return
+    svgElements.forEach((element) => {
+      const attributes: Attributes = getAttributes(element)
+      calculateElementCoordinates(element, attributes)
+    })
+
+    setTimeout(() => {
+      console.log('svgElementCoordinates: ', svgElementCoordinates)
+    }, 1000)
+  }, [svgElements])
 
   const clearCanvas = () => {
     const ctx = canvas?.getContext('2d')
@@ -523,7 +533,7 @@ const App = () => {
 
     setSvgElements(null)
     setActiveElement(null)
-    // setElementCoordinates(null)
+    setSvgElementCoordinates([])
   }
 
   const moveElement = (element: Element, x: number, y: number) => {
@@ -589,7 +599,7 @@ const App = () => {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleMouseMove = (e: MouseEvent) => {
-    if (!activeElement) return;
+    if (!activeElement || !activeIndex) return;
     const offsetX = e.offsetX
     const offsetY = e.offsetY
     
@@ -628,23 +638,24 @@ const App = () => {
 
     for (let i = elArrLength - 1; i >= 0; i--) {
       const element = svgElements![i];
-      if (containsMouse(element, i, mouseX, mouseY)) {
-        if (!activeElement || element !== activeElement) {
-          setActiveElement(element);
-          return;
-        }
-
-        if (element === activeElement && !movingEventListeners) {
-          setMovingEventListeners(true);
-          canvas?.addEventListener('mousemove', handleMouseMove);
-          canvas?.addEventListener('mouseup', handleMouseUp, { once: true });
-        } else {
-          setActiveElement(null);
-          setMovingEventListeners(false);
-          resetCanvas();
-        }
+      const clickedElement = containsMouse(element, i, mouseX, mouseY);
+      if (!activeElement || element !== activeElement) {
+        setActiveElement(element);
+        setActiveIndex(clickedElement ?? null);
         return;
       }
+
+      if (element === activeElement && !movingEventListeners) {
+        setMovingEventListeners(true);
+        canvas?.addEventListener('mousemove', handleMouseMove);
+        canvas?.addEventListener('mouseup', handleMouseUp, { once: true });
+      } else {
+        setActiveElement(null);
+        setActiveIndex(null);
+        setMovingEventListeners(false);
+        resetCanvas();
+      }
+      return;
     }
   }
   
