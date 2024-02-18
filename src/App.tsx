@@ -493,9 +493,6 @@ const App = () => {
   }
   
   const loadSvg = () => {
-    const ctx = canvas?.getContext('2d')
-    if (!ctx) return
-    
     const svg = new DOMParser().parseFromString(svgString, 'image/svg+xml')
     const svgChildren = [...svg.children[0].children];
 
@@ -507,24 +504,25 @@ const App = () => {
     })
 
     setSvgElements(svgChildren)
-
-    svgChildren.forEach((element) => {
-      const attributes: Attributes = getAttributes(element)
-      addToCanvas(ctx, element, attributes)
-    })
   }
 
   useEffect(() => {
+    const ctx = canvas?.getContext('2d')
+    if (!ctx) return
     if (!svgElements) return
+
     svgElements.forEach((element) => {
       const attributes: Attributes = getAttributes(element)
+      addToCanvas(ctx, element, attributes)
       calculateElementCoordinates(element, attributes)
     })
 
-    setTimeout(() => {
-      console.log('svgElementCoordinates: ', svgElementCoordinates)
-    }, 1000)
+    setSvgElementCoordinates([...svgElementCoordinates])
   }, [svgElements])
+
+  useEffect(() => {
+    console.log('svgElementCoordinates: ', svgElementCoordinates)
+  }, [svgElementCoordinates])
 
   const clearCanvas = () => {
     const ctx = canvas?.getContext('2d')
