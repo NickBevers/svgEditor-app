@@ -1,6 +1,6 @@
 # SVG editor 
 
-This is a personal project of mine to create a way to edit, import and export SVG strings into an html canvas and implement it into your own projects through an easy to use API (still a WIP)
+This is a personal project of mine to learn about the different components of an SVG and how HTML5 canvas can work with them
 
 
 
