@@ -2,7 +2,7 @@
 
 This is a personal project of mine to learn about the different components of an SVG and how HTML5 canvas can work with them
 
-
+This project has been abandoned since February 20th because I have learned what I wanted from HTML 5 Canvas and SVG elements.
 
 
 
